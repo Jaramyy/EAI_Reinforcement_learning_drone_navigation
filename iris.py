@@ -29,7 +29,7 @@ TASK_CFG = {"test": False,
             "task": {"name": "iris",
                      "physics_engine": "physx",
                      "env": {
-                             "numEnvs": 128,
+                             "numEnvs": 2048,
                              "envSpacing": 2.5,
                             #  "episodeLength": 100,
                              "enableDebugVis": False,
@@ -164,7 +164,7 @@ class iris(Robot):
             self._usd_path = "/home/jaramy/PegasusSimulator/extensions/pegasus.simulator/pegasus/simulator/assets/Robots/Iris/iris.usd"
 
         add_reference_to_stage(self._usd_path, prim_path)
-        scale = torch.tensor([5, 5, 5])
+        scale = torch.tensor([1, 1, 1])
 
         super().__init__(
             prim_path=prim_path,
@@ -188,8 +188,8 @@ class irisView(ArticulationView):
             name=name,
         )
 
-        self.physics_rotors = [RigidPrimView(prim_paths_expr=f"/World/envs/.*/iris/m{i}_prop",
-                                             name=f"m{i}_prop_view") for i in range(1, 5)]
+        self.physics_rotors = [RigidPrimView(prim_paths_expr=f"/World/envs/.*/iris/rotor{i}",
+                                             name=f"rotor{i}_prop_view") for i in range(0, 4)]
         
 EPS = 1e-6   # small constant to avoid divisions by 0 and log(0)          
 class irisTask(RLTask):
@@ -221,7 +221,7 @@ class irisTask(RLTask):
         RLTask.__init__(self, name=name, env=env)
 
         # parameters for the crazyflie
-        self.arm_length = 0.05
+        self.arm_length = 0.2
 
         # parameters for the controller
         self.motor_damp_time_up = 0.15
@@ -237,8 +237,8 @@ class irisTask(RLTask):
         self.thrust_rot_damp = torch.zeros((self._num_envs, 4), dtype=torch.float32, device=self._device)
 
         # thrust max
-        self.mass = 0.028
-        self.thrust_to_weight = 1.9
+        self.mass = 1.5
+        self.thrust_to_weight = 3.8
 
         self.motor_assymetry = np.array([1.0, 1.0, 1.0, 1.0])
         # re-normalizing to sum-up to 4
@@ -249,7 +249,7 @@ class irisTask(RLTask):
         self.thrust_max = torch.tensor(thrust_max, device=self._device, dtype=torch.float32)
 
         self.motor_linearity = 1.0
-        self.prop_max_rot = 433.3
+        self.prop_max_rot = 800  #433.3
 
         self.target_positions = torch.zeros((self._num_envs, 3), device=self._device, dtype=torch.float32)
         self.target_positions[:, 2] = 1
