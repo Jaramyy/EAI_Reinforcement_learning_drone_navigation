@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 # Import the skrl components to build the RL system
 from skrl.models.torch import Model, GaussianMixin, DeterministicMixin
@@ -26,19 +27,19 @@ class Policy(GaussianMixin, Model):
         Model.__init__(self, observation_space, action_space, device)
         GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std)
 
-        # self.net = nn.Sequential(nn.Linear(self.num_observations, 256),
-        #                          nn.ELU(),
-        #                          nn.Linear(256, 128),
-        #                          nn.ELU(),
-        #                          nn.Linear(128, 64),
-        #                          nn.ELU(),
-        #                          nn.Linear(64, self.num_actions))
-        # self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
-        self.net = nn.Sequential(nn.Linear(self.num_observations, 64),
-                            nn.ELU(),
-                            nn.Linear(64, 32),
-                            nn.ELU(),
-                            nn.Linear(32, self.num_actions))
+        self.net = nn.Sequential(nn.Linear(self.num_observations, 256),
+                                 nn.ELU(),
+                                 nn.Linear(256, 128),
+                                 nn.ELU(),
+                                 nn.Linear(128, 64),
+                                 nn.ELU(),
+                                 nn.Linear(64, self.num_actions))
+        self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
+        # self.net = nn.Sequential(nn.Linear(self.num_observations, 64),
+        #                     nn.ELU(),
+        #                     nn.Linear(64, 32),
+        #                     nn.ELU(),
+        #                     nn.Linear(32, self.num_actions))
         self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))    
 
     def compute(self, inputs, role):
@@ -49,21 +50,45 @@ class Value(DeterministicMixin, Model):
         Model.__init__(self, observation_space, action_space, device)
         DeterministicMixin.__init__(self, clip_actions)
 
-        # self.net = nn.Sequential(nn.Linear(self.num_observations, 256),
-        #                          nn.ELU(),
-        #                          nn.Linear(256, 128),
-        #                          nn.ELU(),
-        #                          nn.Linear(128, 64),
-        #                          nn.ELU(),
-        #                          nn.Linear(64, 1))
-        self.net = nn.Sequential(nn.Linear(self.num_observations, 64),
-                            nn.ELU(),
-                            nn.Linear(64, 32),
-                            nn.ELU(),
-                            nn.Linear(32, 1))
+        self.net = nn.Sequential(nn.Linear(self.num_observations, 256),
+                                 nn.ELU(),
+                                 nn.Linear(256, 128),
+                                 nn.ELU(),
+                                 nn.Linear(128, 64),
+                                 nn.ELU(),
+                                 nn.Linear(64, 1))
+        # self.net = nn.Sequential(nn.Linear(self.num_observations, 64),
+        #                     nn.ELU(),
+        #                     nn.Linear(64, 32),
+        #                     nn.ELU(),
+        #                     nn.Linear(32, 1))
 
     def compute(self, inputs, role):
         return self.net(inputs["states"]), {}
+
+
+
+# define the model
+class MLP(GaussianMixin, Model):
+    def __init__(self, observation_space, action_space, device,
+                 clip_actions=False, clip_log_std=True, min_log_std=-20, max_log_std=2, reduction="sum"):
+        Model.__init__(self, observation_space, action_space, device)
+        GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std, reduction)
+
+        self.fc1 = nn.Linear(self.num_observations, 64)
+        self.fc2 = nn.Linear(64, 32)
+        self.fc3 = nn.Linear(32, self.num_actions)
+
+        self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
+
+    def compute(self, inputs, role):
+        x = self.fc1(inputs["states"])
+        x = F.relu(x)
+        x = self.fc2(x)
+        x = F.relu(x)
+        x = self.fc3(x)
+        return torch.tanh(x), self.log_std_parameter, {}
+    
 
 
 # instance VecEnvBase and setup task
@@ -72,7 +97,8 @@ env = get_env_instance(headless=headless)
 
 from omniisaacgymenvs.utils.config_utils.sim_config import SimConfig
 # from crazyflie import CrazyflieTask2, TASK_CFG
-from iris import irisTask, TASK_CFG
+# from iris import irisTask, TASK_CFG
+from iris_random_physical import irisTask, TASK_CFG
 
 TASK_CFG["headless"] = headless
 # TASK_CFG["task"]["env"]["numEnvs"] = 1024
@@ -119,7 +145,7 @@ cfg_ppo["grad_norm_clip"] = 1.0
 cfg_ppo["ratio_clip"] = 0.2
 cfg_ppo["value_clip"] = 0.2
 cfg_ppo["clip_predicted_values"] = True
-cfg_ppo["entropy_loss_scale"] = 0.0
+cfg_ppo["entropy_loss_scale"] = 0.02     #0.02 Increase 
 cfg_ppo["value_loss_scale"] = 2.0
 cfg_ppo["kl_threshold"] = 0.016
 cfg_ppo["state_preprocessor"] = RunningStandardScaler
@@ -129,6 +155,8 @@ cfg_ppo["value_preprocessor_kwargs"] = {"size": 1, "device": device}
 # logging to TensorBoard and write checkpoints each 32 and 250 timesteps respectively
 cfg_ppo["experiment"]["write_interval"] = 32
 cfg_ppo["experiment"]["checkpoint_interval"] = 250
+
+
 
 agent = PPO(models=models_ppo,
             memory=memory,

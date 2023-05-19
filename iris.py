@@ -29,13 +29,13 @@ TASK_CFG = {"test": False,
             "task": {"name": "iris",
                      "physics_engine": "physx",
                      "env": {
-                             "numEnvs": 2048,
+                             "numEnvs": 1024,
                              "envSpacing": 2.5,
                             #  "episodeLength": 100,
                              "enableDebugVis": False,
                              "clipObservations": 5.0,
                              "clipActions": 1.0,
-                             "maxEpisodeLength": 700
+                             "maxEpisodeLength": 1000 #700
                             #  "controlFrequencyInv": 4,
                             #  "actionScale": 2.5,
                             #  "dofVelocityScale": 0.1,

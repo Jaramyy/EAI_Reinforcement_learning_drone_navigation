@@ -15,7 +15,7 @@ from skrl.utils import omniverse_isaacgym_utils
 
 from omni.isaac.core.utils.extensions import enable_extension
 enable_extension("omni.replicator.isaac")  # required by OIGE
-
+# ฮอนกฮูกในโค้ด
 import carb
 import numpy as np
 import torch
@@ -29,13 +29,13 @@ TASK_CFG = {"test": False,
             "task": {"name": "iris",
                      "physics_engine": "physx",
                      "env": {
-                             "numEnvs": 1024,
+                             "numEnvs": 512,
                              "envSpacing": 2.5,
                             #  "episodeLength": 100,
                              "enableDebugVis": False,
                              "clipObservations": 5.0,
                              "clipActions": 1.0,
-                             "maxEpisodeLength": 700 #700
+                             "maxEpisodeLength": 2000 #700 1400
                             #  "controlFrequencyInv": 4,
                             #  "actionScale": 2.5,
                             #  "dofVelocityScale": 0.1,
@@ -216,7 +216,8 @@ class irisTask(RLTask):
         self._crazyflie_position = torch.tensor([0, 0, 1.0])
         self._ball_position = torch.tensor([0, 0, 1.0])
 
-
+        # self._ball_position = torch.zeros((self._num_envs, 3), device=self._device, dtype=torch.float32)
+        # self._ball_position[:, 2] = 1
 
         RLTask.__init__(self, name=name, env=env)
 
@@ -224,8 +225,8 @@ class irisTask(RLTask):
         self.arm_length = 0.2
 
         # parameters for the controller
-        self.motor_damp_time_up = 0.15
-        self.motor_damp_time_down = 0.15
+        self.motor_damp_time_up = 0.2
+        self.motor_damp_time_down = 0.2 #0.15
 
         # I use the multiplier 4, since 4*T ~ time for a step response to finish, where
         # T is a time constant of the first-order filter
@@ -237,8 +238,8 @@ class irisTask(RLTask):
         self.thrust_rot_damp = torch.zeros((self._num_envs, 4), dtype=torch.float32, device=self._device)
 
         # thrust max
-        self.mass = 1.5
-        self.thrust_to_weight = 3.8
+        self.mass = 1.5  #1.5
+        self.thrust_to_weight = 10.0
 
         self.motor_assymetry = np.array([1.0, 1.0, 1.0, 1.0])
         # re-normalizing to sum-up to 4
@@ -249,7 +250,7 @@ class irisTask(RLTask):
         self.thrust_max = torch.tensor(thrust_max, device=self._device, dtype=torch.float32)
 
         self.motor_linearity = 1.0
-        self.prop_max_rot = 800  #433.3
+        self.prop_max_rot = 900  #433.3
 
         self.target_positions = torch.zeros((self._num_envs, 3), device=self._device, dtype=torch.float32)
         self.target_positions[:, 2] = 1
@@ -320,6 +321,8 @@ class irisTask(RLTask):
 
         self.obs_buf[..., 12:15] = root_linvels
         self.obs_buf[..., 15:18] = root_angvels
+
+        # self.obs_buf[..., 18:21] = previous_action
 
         observations = {
             self._copters.name: {
@@ -431,16 +434,29 @@ class irisTask(RLTask):
 
         self.set_targets(self.all_indices)
 
+    # def set_targets(self, env_ids):
+    #     num_sets = len(env_ids)
+    #     envs_long = env_ids.long()
+    #     # set target position randomly with x, y in (0, 0) and z in (2)
+    #     self.target_positions[envs_long, 0:2] = torch.zeros((num_sets, 2), device=self._device)
+    #     self.target_positions[envs_long, 2] = torch.ones(num_sets, device=self._device) * 2.0
+
+    #     # shift the target up so it visually aligns better
+    #     ball_pos = self.target_positions[envs_long] + self._env_pos[envs_long]
+    #     ball_pos[:, 2] += 0.0
+    #     self._balls.set_world_poses(ball_pos[:, 0:3], self.initial_ball_rot[envs_long].clone(), indices=env_ids)
+
     def set_targets(self, env_ids):
         num_sets = len(env_ids)
         envs_long = env_ids.long()
-        # set target position randomly with x, y in (0, 0) and z in (2)
-        self.target_positions[envs_long, 0:2] = torch.zeros((num_sets, 2), device=self._device)
-        self.target_positions[envs_long, 2] = torch.ones(num_sets, device=self._device) * 2.0
+        # set target position randomly with x, y in (-1, 1) and z in (1, 2)
+        # self.target_positions[envs_long, 0:2] = torch.rand((num_sets, 2), device=self._device) * 2 - 1.95
+        self.target_positions[envs_long, 0:2] = torch.rand((num_sets, 2), device=self._device) * 1.0 -  0.5
+        self.target_positions[envs_long, 2] = torch.rand(num_sets, device=self._device) + 0.03
 
         # shift the target up so it visually aligns better
         ball_pos = self.target_positions[envs_long] + self._env_pos[envs_long]
-        ball_pos[:, 2] += 0.0
+        ball_pos[:, 2] += 0.4
         self._balls.set_world_poses(ball_pos[:, 0:3], self.initial_ball_rot[envs_long].clone(), indices=env_ids)
 
     def reset_idx(self, env_ids):
@@ -485,49 +501,67 @@ class irisTask(RLTask):
 
         # pos reward
         target_dist = torch.sqrt(torch.square(self.target_positions - root_positions).sum(-1))
-        pos_reward = 1.0 / (1.0 + target_dist)
+        pos_reward = 1.0 / (2.0 + target_dist + target_dist)
         self.target_dist = target_dist
         self.root_positions = root_positions
 
         # orient reward
         ups = quat_axis(root_quats, 2)
         self.orient_z = ups[..., 2]
-        up_reward = torch.clamp(ups[..., 2], min=0.0, max=1.0)
+        # up_reward = torch.clamp(ups[..., 2], min=0.0, max=1.0)
+        # ups = quat_axis(root_quats, 2)
+        
+        tiltage = torch.abs(1 - ups[..., 2])
+        up_reward = 1.0 / (1.0 + 30 * tiltage * tiltage)
+  
 
         # effort reward
         effort = torch.square(self.actions).sum(-1)
         effort_reward = 0.05 * torch.exp(-0.5 * effort)
 
         # spin reward
-        spin = torch.square(root_angvels).sum(-1)
-        spin_reward = 0.01 * torch.exp(-1.0 * spin)
+        # spin = torch.square(root_angvels).sum(-1)
+        # spin_reward = 0.01 * torch.exp(-1.0 * spin)
+        
+        spinnage = torch.abs(root_angvels[..., 2])
+        spinnage_reward = 1.0 / (1.0 + 10 * spinnage * spinnage)
 
         # combined reward
-        self.rew_buf[:] = pos_reward + pos_reward * (up_reward + spin_reward) - effort_reward
+        self.rew_buf[:] = pos_reward + pos_reward * (up_reward + spinnage_reward) - effort_reward
 
 
         # log episode reward sums
         self.episode_sums["rew_pos"] += pos_reward
         self.episode_sums["rew_orient"] += up_reward
         self.episode_sums["rew_effort"] += effort_reward
-        self.episode_sums["rew_spin"] += spin_reward
+        self.episode_sums["rew_spin"] += spinnage_reward#spin_reward
 
         # log raw info
         self.episode_sums["raw_dist"] += target_dist
         self.episode_sums["raw_orient"] += ups[..., 2]
         self.episode_sums["raw_effort"] += effort
-        self.episode_sums["raw_spin"] += spin
+        self.episode_sums["raw_spin"] += spinnage #spin
 
     def is_done(self) -> None:
         # resets due to misbehavior
         ones = torch.ones_like(self.reset_buf)
         die = torch.zeros_like(self.reset_buf)
-        die = torch.where(self.target_dist > 5.0, ones, die)
+        die = torch.where(self.target_dist > 20.0, ones, die)
 
         # z >= 0.5 & z <= 5.0 & up > 0
         die = torch.where(self.root_positions[..., 2] < 0.5, ones, die)
-        die = torch.where(self.root_positions[..., 2] > 5.0, ones, die)
+        # die = torch.where(self.root_positions[..., 2] > 5.0, ones, die)
         die = torch.where(self.orient_z < 0.0, ones, die)
 
         # resets due to episode length
         self.reset_buf[:] = torch.where(self.progress_buf >= self._max_episode_length - 1, ones, die)
+
+    # def is_done(self) -> None:
+    #     # resets due to misbehavior
+    #     ones = torch.ones_like(self.reset_buf)
+    #     die = torch.zeros_like(self.reset_buf)
+    #     die = torch.where(self.target_dist > 20.0, ones, die)
+    #     die = torch.where(self.root_positions[..., 2] < 0.5, ones, die)
+
+    #     # resets due to episode length
+    #     self.reset_buf[:] = torch.where(self.progress_buf >= self._max_episode_length - 1, ones, die)
