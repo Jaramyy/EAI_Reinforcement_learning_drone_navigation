@@ -95,8 +95,7 @@ class MLP(GaussianMixin, Model):
 headless = False  # set headless to False for rendering
 env = get_env_instance(headless=headless)
 
-from omni.isaac.core.utils.extensions import enable_extension
-enable_extension("omni.replicator.isaac")  # required by OIGE
+
 
 from omniisaacgymenvs.utils.config_utils.sim_config import SimConfig
 # from crazyflie import CrazyflieTask2, TASK_CFG
@@ -111,7 +110,8 @@ sim_config = SimConfig(TASK_CFG)
 # task = CrazyflieTask2(name="ReachingFranka", sim_config=sim_config, env=env)
 task = irisTask(name="ReachingFranka", sim_config=sim_config, env=env)
 env.set_task(task=task, sim_params=sim_config.get_physics_params(), backend="torch", init_sim=True)
-
+from omni.isaac.core.utils.extensions import enable_extension
+enable_extension("omni.replicator.isaac")  # required by OIGE
 # wrap the environment
 env = wrap_env(env, "omniverse-isaacgym")
 
