@@ -125,7 +125,7 @@ memory = RandomMemory(memory_size=16, num_envs=env.num_envs, device=device)
 models_ppo = {}
 models_ppo["policy"] = Policy(env.observation_space, env.action_space, device)
 models_ppo["value"] = Value(env.observation_space, env.action_space, device)
-models_ppo["mlp"] = MLP(env.observation_space, env.action_space, device)
+# models_ppo["mlp"] = MLP(env.observation_space, env.action_space, device)
 
 # Configure and instantiate the agent.
 # Only modify some of the default configuration, visit its documentation to see all the options

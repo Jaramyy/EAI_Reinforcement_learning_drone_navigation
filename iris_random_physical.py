@@ -211,7 +211,7 @@ class irisTask(RLTask):
 
         self.dt = self._task_cfg["sim"]["dt"]
 
-        self._num_observations = 18
+        self._num_observations = 22  # original 18 ops + 4 prev_action
         self._num_actions = 4
 
         self._crazyflie_position = torch.tensor([0, 0, 1.0])
@@ -256,7 +256,10 @@ class irisTask(RLTask):
         self.target_positions = torch.zeros((self._num_envs, 3), device=self._device, dtype=torch.float32)
         self.target_positions[:, 2] = 1
         self.actions = torch.zeros((self._num_envs, 4), device=self._device, dtype=torch.float32)
+        self.prev_actions = torch.zeros((self._num_envs, 4), device=self._device, dtype=torch.float32)
 
+        self.prev_obs_buf = torch.zeros((self._num_envs, 18), device=self._device, dtype=torch.float32)
+        
         self.all_indices = torch.arange(self._num_envs, dtype=torch.int32, device=self._device)
 
         # Extra info
@@ -313,6 +316,8 @@ class irisTask(RLTask):
 
         root_linvels = self.root_velocities[:, :3]
         root_angvels = self.root_velocities[:, 3:]
+        
+        
 
         self.obs_buf[..., 0:3] = self.target_positions - root_positions
 
@@ -322,9 +327,16 @@ class irisTask(RLTask):
 
         self.obs_buf[..., 12:15] = root_linvels
         self.obs_buf[..., 15:18] = root_angvels
+        # self.prev_obs_buf[..., 18:36] = self.obs_buf
+        # self.obs_buf[..., 18:36] = self.prev_obs_buf
+        # self.obs_buf[..., 36:40] = self.prev_actions
+        self.obs_buf[..., 18:22] = self.prev_actions
 
-        self.obs_buf[..., 18:21] = previous_action
+        # print(self.obs_buf + self.prev_actions)
+        
 
+        # print(self.obs_buf.size())
+        
         observations = {
             self._copters.name: {
                 "obs_buf": self.obs_buf
@@ -346,6 +358,8 @@ class irisTask(RLTask):
 
         actions = actions.clone().to(self._device)
         self.actions = actions
+        self.prev_actions = self.actions
+        # print(self.prev_actions.size())
 
         # clamp to [-1.0, 1.0]
         thrust_cmds = torch.clamp(actions, min=-1.0, max=1.0)
@@ -464,8 +478,11 @@ class irisTask(RLTask):
         num_sets = len(env_ids)
         envs_long = env_ids.long()
         # set target position randomly with x, y in (-1, 1) and z in (1, 2)
-        self.target_positions[envs_long, 0:2] = torch.rand((num_sets, 2), device=self._device) * 2 - 1
-        self.target_positions[envs_long, 2] = torch.rand(num_sets, device=self._device) + 1
+        # self.target_positions[envs_long, 0:2] = torch.rand((num_sets, 2), device=self._device) * 2 - 1
+        # self.target_positions[envs_long, 2] = torch.rand(num_sets, device=self._device) + 1
+
+        self.target_positions[envs_long, 0:2] = torch.rand((num_sets, 2), device=self._device)*0.2-0.1
+        self.target_positions[envs_long, 2] = torch.ones(num_sets, device=self._device) * 2.0
 
         # shift the target up so it visually aligns better
         ball_pos = self.target_positions[envs_long] + self._env_pos[envs_long]
