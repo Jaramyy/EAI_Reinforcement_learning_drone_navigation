@@ -159,7 +159,7 @@ cfg_ppo["experiment"]["write_interval"] = 32
 cfg_ppo["experiment"]["checkpoint_interval"] = 250
 
 from omni.isaac.core.utils.extensions import enable_extension
-enable_extension("omni.replicator.isaac")  # required by OIGE
+# enable_extension("omni.replicator.isaac")  # required by OIGE
 
 agent = PPO(models=models_ppo,
             memory=memory,
