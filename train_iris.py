@@ -100,6 +100,10 @@ env = get_env_instance(headless=headless)
 from omniisaacgymenvs.utils.config_utils.sim_config import SimConfig
 # from crazyflie import CrazyflieTask2, TASK_CFG
 # from iris import irisTask, TASK_CFG
+
+from omni.isaac.core.utils.extensions import enable_extension
+enable_extension("omni.replicator.isaac")  # required by OIGE
+
 from iris_random_physical import irisTask, TASK_CFG
 
 TASK_CFG["headless"] = headless
@@ -108,8 +112,7 @@ TASK_CFG["headless"] = headless
 
 sim_config = SimConfig(TASK_CFG)
 
-from omni.isaac.core.utils.extensions import enable_extension
-enable_extension("omni.replicator.isaac")  # required by OIGE
+
 
 # task = CrazyflieTask2(name="ReachingFranka", sim_config=sim_config, env=env)
 task = irisTask(name="ReachingFranka", sim_config=sim_config, env=env)
