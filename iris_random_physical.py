@@ -486,7 +486,7 @@ class irisTask(RLTask):
 
         # shift the target up so it visually aligns better
         ball_pos = self.target_positions[envs_long] + self._env_pos[envs_long]
-        ball_pos[:, 2] += 0.4
+        ball_pos[:, 2] += 0.0
         self._balls.set_world_poses(ball_pos[:, 0:3], self.initial_ball_rot[envs_long].clone(), indices=env_ids)
 
     def reset_idx(self, env_ids):
