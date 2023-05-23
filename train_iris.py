@@ -107,6 +107,10 @@ TASK_CFG["headless"] = headless
 # TASK_CFG["task"]["env"]["controlSpace"] = "cartesian"  # "joint" or "cartesian"
 
 sim_config = SimConfig(TASK_CFG)
+
+from omni.isaac.core.utils.extensions import enable_extension
+enable_extension("omni.replicator.isaac")  # required by OIGE
+
 # task = CrazyflieTask2(name="ReachingFranka", sim_config=sim_config, env=env)
 task = irisTask(name="ReachingFranka", sim_config=sim_config, env=env)
 env.set_task(task=task, sim_params=sim_config.get_physics_params(), backend="torch", init_sim=True)
@@ -158,8 +162,7 @@ cfg_ppo["value_preprocessor_kwargs"] = {"size": 1, "device": device}
 cfg_ppo["experiment"]["write_interval"] = 32
 cfg_ppo["experiment"]["checkpoint_interval"] = 250
 
-from omni.isaac.core.utils.extensions import enable_extension
-enable_extension("omni.replicator.isaac")  # required by OIGE
+
 
 agent = PPO(models=models_ppo,
             memory=memory,
