@@ -13,8 +13,7 @@ from omni.isaac.core.objects import DynamicSphere
 
 from skrl.utils import omniverse_isaacgym_utils
 
-from omni.isaac.core.utils.extensions import enable_extension
-enable_extension("omni.replicator.isaac")  # required by OIGE
+
 
 
 import carb

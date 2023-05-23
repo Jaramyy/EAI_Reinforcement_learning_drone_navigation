@@ -95,6 +95,9 @@ class MLP(GaussianMixin, Model):
 headless = False  # set headless to False for rendering
 env = get_env_instance(headless=headless)
 
+from omni.isaac.core.utils.extensions import enable_extension
+enable_extension("omni.replicator.isaac")  # required by OIGE
+
 from omniisaacgymenvs.utils.config_utils.sim_config import SimConfig
 # from crazyflie import CrazyflieTask2, TASK_CFG
 # from iris import irisTask, TASK_CFG
