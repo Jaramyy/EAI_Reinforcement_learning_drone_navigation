@@ -92,7 +92,7 @@ class MLP(GaussianMixin, Model):
 
 
 # instance VecEnvBase and setup task
-headless = False  # set headless to False for rendering
+headless = True  # set headless to False for rendering
 env = get_env_instance(headless=headless)
 
 
@@ -158,8 +158,8 @@ cfg_ppo["value_preprocessor_kwargs"] = {"size": 1, "device": device}
 cfg_ppo["experiment"]["write_interval"] = 32
 cfg_ppo["experiment"]["checkpoint_interval"] = 250
 
-# from omni.isaac.core.utils.extensions import enable_extension
-# enable_extension("omni.replicator.isaac")  # required by OIGE
+from omni.isaac.core.utils.extensions import enable_extension
+enable_extension("omni.replicator.isaac")  # required by OIGE
 
 agent = PPO(models=models_ppo,
             memory=memory,
