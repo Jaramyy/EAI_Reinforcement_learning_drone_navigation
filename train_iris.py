@@ -27,19 +27,19 @@ class Policy(GaussianMixin, Model):
         Model.__init__(self, observation_space, action_space, device)
         GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std)
 
-        self.net = nn.Sequential(nn.Linear(self.num_observations, 256),
-                                 nn.ELU(),
-                                 nn.Linear(256, 128),
-                                 nn.ELU(),
-                                 nn.Linear(128, 64),
-                                 nn.ELU(),
-                                 nn.Linear(64, self.num_actions))
-        self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
-        # self.net = nn.Sequential(nn.Linear(self.num_observations, 64),
-        #                     nn.ELU(),
-        #                     nn.Linear(64, 32),
-        #                     nn.ELU(),
-        #                     nn.Linear(32, self.num_actions))
+        # self.net = nn.Sequential(nn.Linear(self.num_observations, 256),
+        #                          nn.ELU(),
+        #                          nn.Linear(256, 128),
+        #                          nn.ELU(),
+        #                          nn.Linear(128, 64),
+        #                          nn.ELU(),
+        #                          nn.Linear(64, self.num_actions))
+        # self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
+        self.net = nn.Sequential(nn.Linear(self.num_observations, 64),
+                            nn.ELU(),
+                            nn.Linear(64, 32),
+                            nn.ELU(),
+                            nn.Linear(32, self.num_actions))
         self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))    
 
     def compute(self, inputs, role):
@@ -50,18 +50,18 @@ class Value(DeterministicMixin, Model):
         Model.__init__(self, observation_space, action_space, device)
         DeterministicMixin.__init__(self, clip_actions)
 
-        self.net = nn.Sequential(nn.Linear(self.num_observations, 256),
-                                 nn.ELU(),
-                                 nn.Linear(256, 128),
-                                 nn.ELU(),
-                                 nn.Linear(128, 64),
-                                 nn.ELU(),
-                                 nn.Linear(64, 1))
-        # self.net = nn.Sequential(nn.Linear(self.num_observations, 64),
-        #                     nn.ELU(),
-        #                     nn.Linear(64, 32),
-        #                     nn.ELU(),
-        #                     nn.Linear(32, 1))
+        # self.net = nn.Sequential(nn.Linear(self.num_observations, 256),
+        #                          nn.ELU(),
+        #                          nn.Linear(256, 128),
+        #                          nn.ELU(),
+        #                          nn.Linear(128, 64),
+        #                          nn.ELU(),
+        #                          nn.Linear(64, 1))
+        self.net = nn.Sequential(nn.Linear(self.num_observations, 64),
+                            nn.ELU(),
+                            nn.Linear(64, 32),
+                            nn.ELU(),
+                            nn.Linear(32, 1))
 
     def compute(self, inputs, role):
         return self.net(inputs["states"]), {}
@@ -141,7 +141,7 @@ models_ppo["value"] = Value(env.observation_space, env.action_space, device)
 # Only modify some of the default configuration, visit its documentation to see all the options
 # https://skrl.readthedocs.io/en/latest/modules/skrl.agents.ppo.html#configuration-and-hyperparameters
 cfg_ppo = PPO_DEFAULT_CONFIG.copy()
-cfg_ppo["rollouts"] = 16 #16
+cfg_ppo["rollouts"] = 20 #16
 cfg_ppo["learning_epochs"] = 8
 cfg_ppo["mini_batches"] = 32
 cfg_ppo["discount_factor"] = 0.99
