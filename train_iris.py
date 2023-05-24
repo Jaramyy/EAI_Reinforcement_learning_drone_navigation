@@ -70,19 +70,21 @@ class Value(DeterministicMixin, Model):
 
 # define the model
 class MLP(GaussianMixin, Model):
-    def __init__(self, num_observations_random, action_space, device,
+    def __init__(self, observation_space, action_space, device,
                  clip_actions=False, clip_log_std=True, min_log_std=-20, max_log_std=2, reduction="sum"):
-        Model.__init__(self, num_observations_random, action_space, device)
+        
+        Model.__init__(self, observation_space, action_space, device)
         GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std, reduction)
-
-        self.fc1 = nn.Linear(self.num_observations_random, 64)
+        
+        num_ramdom_observations = 4 
+        self.fc1 = nn.Linear(num_ramdom_observations, 64)
         self.fc2 = nn.Linear(64, 32)
         self.fc3 = nn.Linear(32, 1 ) #self.num_actions
 
         self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
 
-    def compute(self, inputs, role):
-        x = self.fc1(inputs["states"])
+    def compute(self, inputs):
+        x = self.fc1(inputs)
         x = F.relu(x)
         x = self.fc2(x)
         x = F.relu(x)
@@ -132,16 +134,18 @@ memory = RandomMemory(memory_size=16, num_envs=env.num_envs, device=device)
 # Instantiate the agent's models (function approximators).
 # PPO requires 2 models, visit its documentation for more details
 # https://skrl.readthedocs.io/en/latest/modules/skrl.agents.ppo.html#spaces-and-models
+print(env.observation_space)
+
 models_ppo = {}
 models_ppo["policy"] = Policy(env.observation_space, env.action_space, device)
 models_ppo["value"] = Value(env.observation_space, env.action_space, device)
-# models_ppo["mlp"] = MLP(env.observation_space, env.action_space, device)
+models_ppo["mlp"] = MLP(env.observation_space, env.action_space, device)
 
 # Configure and instantiate the agent.
 # Only modify some of the default configuration, visit its documentation to see all the options
 # https://skrl.readthedocs.io/en/latest/modules/skrl.agents.ppo.html#configuration-and-hyperparameters
 cfg_ppo = PPO_DEFAULT_CONFIG.copy()
-cfg_ppo["rollouts"] = 20 #16
+cfg_ppo["rollouts"] = 16 #16
 cfg_ppo["learning_epochs"] = 8
 cfg_ppo["mini_batches"] = 32
 cfg_ppo["discount_factor"] = 0.99

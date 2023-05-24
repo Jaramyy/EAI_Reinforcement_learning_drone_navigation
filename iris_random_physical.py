@@ -12,7 +12,7 @@ from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.objects import DynamicSphere
 
 from skrl.utils import omniverse_isaacgym_utils
-
+from skrl.agents.torch.ppo import PPO
 
 
 
@@ -192,7 +192,7 @@ class irisView(ArticulationView):
                                              name=f"rotor{i}_prop_view") for i in range(0, 4)]
         
 EPS = 1e-6   # small constant to avoid divisions by 0 and log(0)          
-class irisTask(RLTask):
+class irisTask(RLTask,PPO):
     def __init__(
             self,
             name,
@@ -210,8 +210,10 @@ class irisTask(RLTask):
 
         self.dt = self._task_cfg["sim"]["dt"]
 
-        self._num_observations = 22  # original 18 ops + 4 prev_action
+        self._num_observations = 24  # original 18 ops + 4 prev_action + 2 physical random
         self._num_actions = 4
+
+        self._num_observations_random = 4 
 
         self._crazyflie_position = torch.tensor([0, 0, 1.0])
         self._ball_position = torch.tensor([0, 0, 1.0])
@@ -238,8 +240,12 @@ class irisTask(RLTask):
         self.thrust_rot_damp = torch.zeros((self._num_envs, 4), dtype=torch.float32, device=self._device)
 
         # thrust max
-        self.mass = 1.5  #1.5
-        self.thrust_to_weight = 10.0
+        # self.mass = 1.5  #1.5
+        # # print(self.mass)
+        # self.thrust_to_weight = 10.0
+        self.mass = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
+        # print(self.mass)
+        self.thrust_to_weight = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 12.0
 
         self.motor_assymetry = np.array([1.0, 1.0, 1.0, 1.0])
         # re-normalizing to sum-up to 4
@@ -258,6 +264,9 @@ class irisTask(RLTask):
         self.prev_actions = torch.zeros((self._num_envs, 4), device=self._device, dtype=torch.float32)
 
         self.prev_obs_buf = torch.zeros((self._num_envs, 18), device=self._device, dtype=torch.float32)
+        
+        # self.ramdom_mass = torch.zeros((self._num_envs, 1), device=self._device, dtype=torch.float32)
+        # self.ramdom_thrust = torch.zeros((self._num_envs, 1), device=self._device, dtype=torch.float32)
         
         self.all_indices = torch.arange(self._num_envs, dtype=torch.int32, device=self._device)
 
@@ -316,7 +325,15 @@ class irisTask(RLTask):
         root_linvels = self.root_velocities[:, :3]
         root_angvels = self.root_velocities[:, 3:]
         
+        # thrust max
+        self.mass = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
+        # print(self.mass)
+        self.thrust_to_weight = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 12.0
         
+        self.grav_z = -1.0 * self._task_cfg["sim"]["gravity"][2]
+        thrust_max_ = self.grav_z * self.mass * self.thrust_to_weight * self.motor_assymetry / 4.0
+        self.thrust_max = torch.tensor(thrust_max_, device=self._device, dtype=torch.float32)
+        print("Thrust max = ",self.thrust_max)
 
         self.obs_buf[..., 0:3] = self.target_positions - root_positions
 
@@ -331,6 +348,8 @@ class irisTask(RLTask):
         # self.obs_buf[..., 36:40] = self.prev_actions
         self.obs_buf[..., 18:22] = self.prev_actions
 
+        self.obs_buf[..., 22:23] =  torch.from_numpy(self.mass)  #mass
+        self.obs_buf[..., 23:24] =  torch.from_numpy(self.thrust_to_weight) #Thrust
         # print(self.obs_buf + self.prev_actions)
         
 
@@ -563,7 +582,7 @@ class irisTask(RLTask):
         self.episode_sums["rew_pos"] += pos_reward
         self.episode_sums["rew_orient"] += up_reward
         self.episode_sums["rew_effort"] += effort_reward
-        self.episode_sums["rew_spin"] += spinnage_reward#spin_reward
+        self.episode_sums["rew_spin"] += spinnage_reward #spin_reward
 
         # log raw info
         self.episode_sums["raw_dist"] += target_dist
