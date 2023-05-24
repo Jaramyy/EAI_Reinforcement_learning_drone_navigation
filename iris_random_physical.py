@@ -481,7 +481,7 @@ class irisTask(RLTask):
         # self.target_positions[envs_long, 2] = torch.rand(num_sets, device=self._device) + 1
 
         self.target_positions[envs_long, 0:2] = torch.rand((num_sets, 2), device=self._device)*0.2-0.1
-        self.target_positions[envs_long, 2] = torch.ones(num_sets, device=self._device) * 2.0
+        self.target_positions[envs_long, 2] = torch.rand(num_sets, device=self._device) * 2.0 + 0.15
 
         # shift the target up so it visually aligns better
         ball_pos = self.target_positions[envs_long] + self._env_pos[envs_long]
