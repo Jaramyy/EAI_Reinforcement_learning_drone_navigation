@@ -35,14 +35,14 @@ TASK_CFG = {"test": False,
                              "enableDebugVis": False,
                              "clipObservations": 5.0,
                              "clipActions": 1.0,
-                             "maxEpisodeLength": 1000 #700 1400 
+                             "maxEpisodeLength": 700 #700 1400 
                             #  "controlFrequencyInv": 4,
                             #  "actionScale": 2.5,
                             #  "dofVelocityScale": 0.1,
                             #  "controlSpace": "cartesian"
                              },
                      "sim": {
-                             "dt": 0.005,  # 1 / 120
+                             "dt": 0.01,  # 1 / 120
                              "use_gpu_pipeline": True,
                              "gravity": [0.0, 0.0, -9.81],
                              "add_ground_plane": True,
