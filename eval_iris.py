@@ -220,7 +220,7 @@ env = get_env_instance(headless=headless)
 
 
 from omniisaacgymenvs.utils.config_utils.sim_config import SimConfig
-# from crazyflie import CrazyflieTask2, TASK_CFG
+from crazyflie import CrazyflieTask2, TASK_CFG
 # from iris import irisTask, TASK_CFG
 
 if headless is True:
@@ -237,8 +237,8 @@ sim_config = SimConfig(TASK_CFG)
 
 
 
-# task = CrazyflieTask2(name="ReachingFranka", sim_config=sim_config, env=env)
-task = irisTask(name="ReachingFranka", sim_config=sim_config, env=env)
+task = CrazyflieTask2(name="ReachingFranka", sim_config=sim_config, env=env)
+# task = irisTask(name="ReachingFranka", sim_config=sim_config, env=env)
 env.set_task(task=task, sim_params=sim_config.get_physics_params(), backend="torch", init_sim=True)
 
 # wrap the environment
@@ -254,56 +254,42 @@ memory = RandomMemory(memory_size=16, num_envs=env.num_envs, device=device)
 # Instantiate the agent's models (function approximators).
 # PPO requires 2 models, visit its documentation for more details
 # https://skrl.readthedocs.io/en/latest/modules/skrl.agents.ppo.html#spaces-and-models
-print(env.observation_space)
+# print(env.observation_space)
 
 models_ppo = {}
 models_ppo["policy"] = Policy(env.observation_space, env.action_space, device)
-models_ppo["value"] = Value(env.observation_space, env.action_space, device)
+# models_ppo["value"] = Value(env.observation_space, env.action_space, device)
 models_ppo["mlp"] = MLP(env.observation_space, env.action_space, device)
 
 # Configure and instantiate the agent.
 # Only modify some of the default configuration, visit its documentation to see all the options
 # https://skrl.readthedocs.io/en/latest/modules/skrl.agents.ppo.html#configuration-and-hyperparameters
 cfg_ppo = PPO_DEFAULT_CONFIG.copy()
-cfg_ppo["rollouts"] = 16 #16
-cfg_ppo["learning_epochs"] = 8
-cfg_ppo["mini_batches"] = 32
-cfg_ppo["discount_factor"] = 0.99
-cfg_ppo["lambda"] = 0.95
-cfg_ppo["learning_rate"] = 1e-4
-cfg_ppo["learning_rate_scheduler"] = KLAdaptiveRL
-cfg_ppo["learning_rate_scheduler_kwargs"] = {"kl_threshold": 0.016}
 cfg_ppo["random_timesteps"] = 0
 cfg_ppo["learning_starts"] = 0
-cfg_ppo["grad_norm_clip"] = 1.0
-cfg_ppo["ratio_clip"] = 0.2
-cfg_ppo["value_clip"] = 0.2
-cfg_ppo["clip_predicted_values"] = True
-cfg_ppo["entropy_loss_scale"] = 0.02     #0.02 Increase 
-cfg_ppo["value_loss_scale"] = 2.0
-cfg_ppo["kl_threshold"] = 0.016
 cfg_ppo["state_preprocessor"] = RunningStandardScaler
 cfg_ppo["state_preprocessor_kwargs"] = {"size": env.observation_space, "device": device}
-cfg_ppo["value_preprocessor"] = RunningStandardScaler
-cfg_ppo["value_preprocessor_kwargs"] = {"size": 1, "device": device}
-# logging to TensorBoard and write checkpoints each 32 and 250 timesteps respectively
+# logging to TensorBoard each 32 timesteps an ignore checkpoints
 cfg_ppo["experiment"]["write_interval"] = 32
-cfg_ppo["experiment"]["checkpoint_interval"] = 250
-
-
+cfg_ppo["experiment"]["checkpoint_interval"] = 0
 
 agent = PPO(models=models_ppo,
-            memory=memory,
+            memory=None,
             cfg=cfg_ppo,
             observation_space=env.observation_space,
             action_space=env.action_space,
             device=device)
 
+# load checkpoints
+# if TASK_CFG["task"]["env"]["controlSpace"] == "joint":
+#     agent.load("./agent_joint.pt")
+# elif TASK_CFG["task"]["env"]["controlSpace"] == "cartesian":
+#     agent.load("./agent_cartesian.pt")
+agent.load("/home/jaramy/EAI_Reinforcement_learning_drone_navigation/runs/23-05-26_17-45-11-679605_PPO/checkpoints/agent_444750.pt")
 
 # Configure and instantiate the RL trainer
-cfg_trainer = {"timesteps": 500000, "headless": True}
+cfg_trainer = {"timesteps": 5000, "headless": True}
 trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=agent)
 
-# start training
-# trainer.train()
+# start evaluation
 trainer.eval()

@@ -243,6 +243,7 @@ class irisTask(RLTask,PPO):
         # self.mass = 1.5  #1.5
         # # print(self.mass)
         # self.thrust_to_weight = 10.0
+        
         self.mass = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
         # print(self.mass)
         self.thrust_to_weight = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 12.0
@@ -439,11 +440,11 @@ class irisTask(RLTask,PPO):
         # thrust max
         for env_idx in reset_env_ids:
             # print("env id -> ",env_idx)
-            self.mass[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy() *3.0
+            self.mass[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy()*3.0 + 0.1
         # self.mass = torch.rand(self._num_envs, 1, device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
         # self.mass = torch.rand(self._num_envs, 1, device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
         # print(self.mass)
-            self.thrust_to_weight[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy() * 12.0
+            self.thrust_to_weight[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy() * 12.0 + 0.1
         
         self.grav_z = -1.0 * self._task_cfg["sim"]["gravity"][2]
         thrust_max_ = self.grav_z * self.mass * self.thrust_to_weight * self.motor_assymetry / 4.0
