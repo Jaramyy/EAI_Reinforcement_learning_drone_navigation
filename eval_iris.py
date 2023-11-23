@@ -220,14 +220,15 @@ env = get_env_instance(headless=headless)
 
 
 from omniisaacgymenvs.utils.config_utils.sim_config import SimConfig
-from crazyflie import CrazyflieTask2, TASK_CFG
-# from iris import irisTask, TASK_CFG
+# from crazyflie import CrazyflieTask2, TASK_CFG
+from iris import irisTask, TASK_CFG
 
 if headless is True:
     from omni.isaac.core.utils.extensions import enable_extension
     enable_extension("omni.replicator.isaac")  # required by OIGE
 
-from iris_random_physical import irisTask, TASK_CFG
+from iris_random_physical_eval import irisTask, TASK_CFG
+# from crazyfile_random_physical import irisTask, TASK_CFG
 
 TASK_CFG["headless"] = headless
 # TASK_CFG["task"]["env"]["numEnvs"] = 1024
@@ -237,8 +238,8 @@ sim_config = SimConfig(TASK_CFG)
 
 
 
-task = CrazyflieTask2(name="ReachingFranka", sim_config=sim_config, env=env)
-# task = irisTask(name="ReachingFranka", sim_config=sim_config, env=env)
+# task = CrazyflieTask2(name="ReachingFranka", sim_config=sim_config, env=env)
+task = irisTask(name="iris", sim_config=sim_config, env=env)
 env.set_task(task=task, sim_params=sim_config.get_physics_params(), backend="torch", init_sim=True)
 
 # wrap the environment
@@ -285,7 +286,7 @@ agent = PPO(models=models_ppo,
 #     agent.load("./agent_joint.pt")
 # elif TASK_CFG["task"]["env"]["controlSpace"] == "cartesian":
 #     agent.load("./agent_cartesian.pt")
-agent.load("/home/jaramy/EAI_Reinforcement_learning_drone_navigation/runs/23-05-26_17-45-11-679605_PPO/checkpoints/agent_444750.pt")
+agent.load("/home/jaramy/EAI_Reinforcement_learning_drone_navigation/runs/23-05-26_17-45-11-679605_PPO/checkpoints/agent_355000.pt")
 
 # Configure and instantiate the RL trainer
 cfg_trainer = {"timesteps": 5000, "headless": True}

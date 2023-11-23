@@ -227,7 +227,7 @@ if headless is True:
     from omni.isaac.core.utils.extensions import enable_extension
     enable_extension("omni.replicator.isaac")  # required by OIGE
 
-from iris_random_physical import irisTask, TASK_CFG
+from iris_random_physical_eval import irisTask, TASK_CFG
 
 TASK_CFG["headless"] = headless
 # TASK_CFG["task"]["env"]["numEnvs"] = 1024
@@ -305,5 +305,5 @@ cfg_trainer = {"timesteps": 500000, "headless": True}
 trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=agent)
 
 # start training
-# trainer.train()
-trainer.eval()
+trainer.train()
+# trainer.eval()

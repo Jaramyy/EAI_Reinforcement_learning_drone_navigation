@@ -143,7 +143,7 @@ class iris(Robot):
     def __init__(
         self,
         prim_path: str,
-        name: Optional[str] = "iris",
+        name: Optional[str] = "crazyflie",
         usd_path: Optional[str] = None,
         translation: Optional[np.ndarray] = None,
         orientation: Optional[np.ndarray] = None,
@@ -159,12 +159,10 @@ class iris(Robot):
             assets_root_path = get_assets_root_path()
             if assets_root_path is None:
                 carb.log_error("Could not find Isaac Sim assets folder")
-            # self._usd_path = assets_root_path + "/Isaac/Robots/Crazyflie/cf2x.usd"
-            print("assets_root_path = ",assets_root_path)
-            self._usd_path = "/home/jaramy/PegasusSimulator/extensions/pegasus.simulator/pegasus/simulator/assets/Robots/Iris/iris.usd"
+            self._usd_path = assets_root_path + "/Isaac/Robots/Crazyflie/cf2x.usd"
 
         add_reference_to_stage(self._usd_path, prim_path)
-        scale = torch.tensor([1, 1, 1])
+        scale = torch.tensor([5, 5, 5])
 
         super().__init__(
             prim_path=prim_path,
@@ -178,7 +176,7 @@ class irisView(ArticulationView):
     def __init__(
         self,
         prim_paths_expr: str,
-        name: Optional[str] = "irisView"
+        name: Optional[str] = "CrazyflieView"
     ) -> None:
         """[summary]
         """
@@ -188,8 +186,8 @@ class irisView(ArticulationView):
             name=name,
         )
 
-        self.physics_rotors = [RigidPrimView(prim_paths_expr=f"/World/envs/.*/iris/rotor{i}",
-                                             name=f"rotor{i}_prop_view") for i in range(0, 4)]
+        self.physics_rotors = [RigidPrimView(prim_paths_expr=f"/World/envs/.*/Crazyflie/m{i}_prop",
+                                             name=f"m{i}_prop_view") for i in range(1, 5)]
         
 EPS = 1e-6   # small constant to avoid divisions by 0 and log(0)          
 class irisTask(RLTask,PPO):
@@ -240,12 +238,12 @@ class irisTask(RLTask,PPO):
         self.thrust_rot_damp = torch.zeros((self._num_envs, 4), dtype=torch.float32, device=self._device)
 
         # thrust max
-        # self.mass = 1.5  #1.5
-        # # print(self.mass)
-        # self.thrust_to_weight = 10.0
-        self.mass = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
+        self.mass = 0.028
+        self.thrust_to_weight = 1.9
+        
+        # self.mass = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
         # print(self.mass)
-        self.thrust_to_weight = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 12.0
+        # self.thrust_to_weight = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 12.0
 
         self.motor_assymetry = np.array([1.0, 1.0, 1.0, 1.0])
         # re-normalizing to sum-up to 4
@@ -285,7 +283,7 @@ class irisTask(RLTask,PPO):
         self.get_iris()
         self.get_target()
         RLTask.set_up_scene(self, scene)
-        self._copters = irisView(prim_paths_expr="/World/envs/.*/iris", name="iris_view")
+        self._copters = irisView(prim_paths_expr="/World/envs/.*/Crazyflie", name="crazyflie_view")
         self._balls = RigidPrimView(prim_paths_expr="/World/envs/.*/ball")
         scene.add(self._copters)
         scene.add(self._balls)
@@ -293,11 +291,12 @@ class irisTask(RLTask,PPO):
             scene.add(self._copters.physics_rotors[i])
         return
  
+ 
     
     def get_iris(self):
-        copter = iris(prim_path=self.default_zero_env_path + "/iris", name="iris",translation=self._crazyflie_position)
-        self._sim_config.apply_articulation_settings("iris", get_prim_at_path(copter.prim_path),
-                                                     self._sim_config.parse_actor_config("iris"))
+        copter = iris(prim_path=self.default_zero_env_path + "/Crazyflie", name="crazyflie",translation=self._crazyflie_position)
+        self._sim_config.apply_articulation_settings("crazyflie", get_prim_at_path(copter.prim_path),
+                                                     self._sim_config.parse_actor_config("crazyflie"))
 
     def get_target(self):
         radius = 0.1
@@ -340,8 +339,8 @@ class irisTask(RLTask,PPO):
         # self.obs_buf[..., 36:40] = self.prev_actions
         self.obs_buf[..., 18:22] = self.prev_actions
 
-        self.obs_buf[..., 22:23] =  torch.from_numpy(self.mass)  #mass
-        self.obs_buf[..., 23:24] =  torch.from_numpy(self.thrust_to_weight) #Thrust
+        self.obs_buf[..., 22:23] =  self.mass #torch.from_numpy(self.mass)  #mass
+        self.obs_buf[..., 23:24] =  self.thrust_to_weight#torch.from_numpy(self.thrust_to_weight) #Thrust
         # print(self.obs_buf + self.prev_actions)
         
 
@@ -370,7 +369,7 @@ class irisTask(RLTask,PPO):
         self.actions = actions
         # self.prev_actions = self.actions  #for 1 previous timestep
         
-        self.prev_actions = self.actions  #for 10 previous timestep
+        self.prev_actions = self.actions*0.1  #for 10 previous timestep
 
 
         # clamp to [-1.0, 1.0]
@@ -437,18 +436,18 @@ class irisTask(RLTask,PPO):
         # print(self.prev_actions.size())
         print("reset -> ",reset_env_ids)
         # thrust max
-        for env_idx in reset_env_ids:
-            # print("env id -> ",env_idx)
-            self.mass[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy() *3.0
-        # self.mass = torch.rand(self._num_envs, 1, device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
-        # self.mass = torch.rand(self._num_envs, 1, device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
-        # print(self.mass)
-            self.thrust_to_weight[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy() * 12.0
+        # for env_idx in reset_env_ids:
+        #     # print("env id -> ",env_idx)
+        #     self.mass[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy()*3.0 + 0.1
+        # # self.mass = torch.rand(self._num_envs, 1, device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
+        # # self.mass = torch.rand(self._num_envs, 1, device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
+        # # print(self.mass)
+        #     self.thrust_to_weight[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy() * 12.0 + 0.1
         
-        self.grav_z = -1.0 * self._task_cfg["sim"]["gravity"][2]
-        thrust_max_ = self.grav_z * self.mass * self.thrust_to_weight * self.motor_assymetry / 4.0
-        self.thrust_max = torch.tensor(thrust_max_, device=self._device, dtype=torch.float32)
-        print("Thrust max = ",self.thrust_max)
+        # self.grav_z = -1.0 * self._task_cfg["sim"]["gravity"][2]
+        # thrust_max_ = self.grav_z * self.mass * self.thrust_to_weight * self.motor_assymetry / 4.0
+        # self.thrust_max = torch.tensor(thrust_max_, device=self._device, dtype=torch.float32)
+        # print("Thrust max = ",self.thrust_max)
 
         # spin spinning rotors
         prop_rot = self.thrust_cmds_damp * self.prop_max_rot

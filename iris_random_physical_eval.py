@@ -29,7 +29,7 @@ TASK_CFG = {"test": False,
             "task": {"name": "iris",
                      "physics_engine": "physx",
                      "env": {
-                             "numEnvs": 1024,
+                             "numEnvs": 5,
                              "envSpacing": 2.5,
                             #  "episodeLength": 100,
                              "enableDebugVis": False,
@@ -210,7 +210,7 @@ class irisTask(RLTask,PPO):
 
         self.dt = self._task_cfg["sim"]["dt"]
 
-        self._num_observations = 24  # original 18 ops + 4 prev_action + 2 physical random
+        self._num_observations = 22  # original 18 ops + 4 prev_action + 2 physical random
         self._num_actions = 4
 
         self._num_observations_random = 4 
@@ -240,12 +240,13 @@ class irisTask(RLTask,PPO):
         self.thrust_rot_damp = torch.zeros((self._num_envs, 4), dtype=torch.float32, device=self._device)
 
         # thrust max
-        # self.mass = 1.5  #1.5
+        self.mass = 1.5  #1.5
         # # print(self.mass)
-        # self.thrust_to_weight = 10.0
-        self.mass = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
+        self.thrust_to_weight = 4.0
+        
+        # self.mass = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
         # print(self.mass)
-        self.thrust_to_weight = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 12.0
+        # self.thrust_to_weight = torch.rand((self._num_envs, 1), device=self._device, dtype=torch.float32).cpu().numpy() * 12.0
 
         self.motor_assymetry = np.array([1.0, 1.0, 1.0, 1.0])
         # re-normalizing to sum-up to 4
@@ -340,8 +341,8 @@ class irisTask(RLTask,PPO):
         # self.obs_buf[..., 36:40] = self.prev_actions
         self.obs_buf[..., 18:22] = self.prev_actions
 
-        self.obs_buf[..., 22:23] =  torch.from_numpy(self.mass)  #mass
-        self.obs_buf[..., 23:24] =  torch.from_numpy(self.thrust_to_weight) #Thrust
+        # self.obs_buf[..., 22:23] =  self.mass #torch.from_numpy(self.mass)  #mass
+        # self.obs_buf[..., 23:24] =  self.thrust_to_weight#torch.from_numpy(self.thrust_to_weight) #Thrust
         # print(self.obs_buf + self.prev_actions)
         
 
@@ -362,9 +363,6 @@ class irisTask(RLTask,PPO):
         if len(reset_env_ids) > 0:
             self.reset_idx(reset_env_ids)
 
-        set_target_ids = (self.progress_buf % 500 == 0).nonzero(as_tuple=False).squeeze(-1)
-        if len(set_target_ids) > 0:
-            self.set_targets(set_target_ids)
 
         actions = actions.clone().to(self._device)
         self.actions = actions
@@ -392,9 +390,10 @@ class irisTask(RLTask,PPO):
         thrust_noise = thrust_cmds * thrust_noise
         self.thrust_cmds_damp = torch.clamp(self.thrust_cmds_damp + thrust_noise, min=0.0, max=1.0)
         
-        print("Size tensor ",self.thrust_max.size())
+        # print("Size tensor ",self.thrust_max.size())
         thrusts = self.thrust_max * self.thrust_cmds_damp
-
+        print("thrusts -> ",thrusts)
+        print("thrusts shape -> ",thrusts.shape)
         # thrusts given rotation
         root_quats = self.root_rot
         rot_x = quat_axis(root_quats, 0)
@@ -404,13 +403,41 @@ class irisTask(RLTask,PPO):
 
         force_x = torch.zeros(self._num_envs, 4, dtype=torch.float32, device=self._device)
         force_y = torch.zeros(self._num_envs, 4, dtype=torch.float32, device=self._device)
-        force_xy = torch.cat((force_x, force_y), 1).reshape(-1, 4, 2)
+
+        force_xy = torch.cat((force_x, force_y), 1)
+        print("force xy = ",force_xy.shape)
+
+        force_xy = force_xy.reshape(-1, 4, 2)   #Dim (num_envs, 4, 2)
+        print("force xy reshape = ",force_xy.shape)
         
+        # reshape(-1, 4, 2)   #Dim (num_envs, 4, 2)
+        
+        # print("force_x shape",force_xy.shape)
+        # print(force_xy)
+
         thrusts = thrusts.reshape(-1, 4, 1)
+
+        print("thrust shape",force_xy.shape)
+        print(force_xy)
+        
+        print("thrust shape",thrusts.shape)
+        print(thrusts)
+
         thrusts = torch.cat((force_xy, thrusts), 2)
 
+        
+        print("thrust shape",thrusts.shape)
+        print(thrusts)
+
         thrusts_0 = thrusts[:, 0]
+
+        print("thrust0 ",thrusts_0.shape)
+        print(thrusts_0)
+
         thrusts_0 = thrusts_0[:, :, None]
+
+        print("thrust0 ",thrusts_0.shape)
+        print(thrusts_0)
 
         thrusts_1 = thrusts[:, 1]
         thrusts_1 = thrusts_1[:, :, None]
@@ -435,31 +462,36 @@ class irisTask(RLTask,PPO):
         self.thrusts[reset_env_ids] = 0
 
         # print(self.prev_actions.size())
-        print("reset -> ",reset_env_ids)
+        # print("reset -> ",reset_env_ids)
         # thrust max
-        for env_idx in reset_env_ids:
-            # print("env id -> ",env_idx)
-            self.mass[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy() *3.0
-        # self.mass = torch.rand(self._num_envs, 1, device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
-        # self.mass = torch.rand(self._num_envs, 1, device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
-        # print(self.mass)
-            self.thrust_to_weight[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy() * 12.0
+        # for env_idx in reset_env_ids:
+        #     # print("env id -> ",env_idx)
+        #     self.mass[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy()*3.0 + 0.1
+        # # self.mass = torch.rand(self._num_envs, 1, device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
+        # # self.mass = torch.rand(self._num_envs, 1, device=self._device, dtype=torch.float32).cpu().numpy() * 3.0  #1.5
+        # # print(self.mass)
+        #     self.thrust_to_weight[env_idx] = torch.rand(1, device=self._device, dtype=torch.float32).cpu().numpy() * 12.0 + 0.1
         
-        self.grav_z = -1.0 * self._task_cfg["sim"]["gravity"][2]
-        thrust_max_ = self.grav_z * self.mass * self.thrust_to_weight * self.motor_assymetry / 4.0
-        self.thrust_max = torch.tensor(thrust_max_, device=self._device, dtype=torch.float32)
-        print("Thrust max = ",self.thrust_max)
+        # self.grav_z = -1.0 * self._task_cfg["sim"]["gravity"][2]
+        # thrust_max_ = self.grav_z * self.mass * self.thrust_to_weight * self.motor_assymetry / 4.0
+        # self.thrust_max = torch.tensor(thrust_max_, device=self._device, dtype=torch.float32)
+        # print("Thrust max = ",self.thrust_max)
 
         # spin spinning rotors
         prop_rot = self.thrust_cmds_damp * self.prop_max_rot
+        # print(prop_rot)
+        # print("1st",prop_rot[:, 0])
         self.dof_vel[:, 0] = prop_rot[:, 0]
         self.dof_vel[:, 1] = -1.0 * prop_rot[:, 1]
         self.dof_vel[:, 2] = prop_rot[:, 2]
         self.dof_vel[:, 3] = -1.0 * prop_rot[:, 3]
 
+        # print(self.dof_vel)
         self._copters.set_joint_velocities(self.dof_vel)
 
         # apply actions
+        # print("thrusts -> ",self.thrusts)
+        # print("thrusts -> ",self.thrusts.shape)
         for i in range(4):
             self._copters.physics_rotors[i].apply_forces(self.thrusts[:, i], indices=self.all_indices)
 
